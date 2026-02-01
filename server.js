@@ -1,8 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
@@ -10,52 +8,63 @@ const app = express();
 // Middleware
 app.use(helmet());
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+    origin: '*', // Allow all for now, change later
     credentials: true
 }));
-app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
 
 // Routes
 const chatRoutes = require('./routes/chat');
 const authRoutes = require('./routes/auth');
 
-app.use('/api/chat', chatRoutes);
-app.use('/api/auth', authRoutes);
-
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(err.status || 500).json({
-        error: {
-            message: err.message || 'Internal server error',
-            ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-        }
+// Root route - TEST THIS FIRST
+app.get('/', (req, res) => {
+    res.json({ 
+        message: '🚀 EimemesChat AI Backend is Running',
+        endpoints: {
+            chat: 'POST /api/chat',
+            auth: 'GET /api/auth/profile',
+            health: 'GET /health'
+        },
+        timestamp: new Date().toISOString()
     });
 });
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Route not found' });
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: '✅ OK',
+        service: 'EimemesChat AI',
+        timestamp: new Date().toISOString() 
+    });
+});
+
+// API Routes
+app.use('/api/chat', chatRoutes);
+app.use('/api/auth', authRoutes);
+
+// 404 handler - MUST BE AFTER ALL ROUTES
+app.use('*', (req, res) => {
+    res.status(404).json({ 
+        error: 'Route not found',
+        requested: req.originalUrl,
+        available: ['/', '/health', '/api/chat', '/api/auth']
+    });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+    console.error('Server Error:', err);
+    res.status(500).json({ 
+        error: 'Internal server error',
+        message: err.message 
+    });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌐 Frontend: ${process.env.FRONTEND_URL}`);
-    console.log(`🔒 NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`🚀 EimemesChat AI Backend running on port ${PORT}`);
+    console.log(`✅ Health check: http://localhost:${PORT}/health`);
+    console.log(`✅ API Base: http://localhost:${PORT}/api`);
 });
